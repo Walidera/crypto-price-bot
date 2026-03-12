@@ -14,9 +14,9 @@ CHAT_ID = os.getenv("CHAT_ID")
 CHECK_INTERVAL = 60  # seconds
 
 coins = {
-    "bitcoin": 70800,
-    "ethereum": 2060,
-    "solana": 87
+    "bitcoin": 70500,
+    "ethereum": 2020,
+    "solana": 85
 }
 
 
