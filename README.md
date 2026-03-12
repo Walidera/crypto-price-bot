@@ -10,12 +10,16 @@ A Python automation bot that monitors cryptocurrency prices and sends alerts via
 - Runs automatically in a loop
 - Uses CoinGecko API for price data
 
+## Deployment
+This bot is deployed on Railway and runs 24/7
+
 ## Technologies Used
 
 - Python
 - Requests Library
 - Telegram Bot API
 - CoinGecko API
+- Railway Cloud Hosting
 
 ## Installation
 
