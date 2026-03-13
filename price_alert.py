@@ -1,26 +1,29 @@
 import requests
 import time
 import os
+from flask import Flask, request, jsonify
 from dotenv import load_dotenv
+from threading import Thread
 
-
-# CONFIGURATION
+# LOAD ENV VARIABLES
 
 load_dotenv()
 
 TOKEN = os.getenv("TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-CHECK_INTERVAL = 60  # seconds
+CHECK_INTERVAL = 60
 
-coins = {
-    "bitcoin": 70500,
-    "ethereum": 2020,
-    "solana": 85
-}
+# FLASK APP
 
 
-# TELEGRAM FUNCTION
+app = Flask(__name__)
+
+# store alert targets
+alerts = {}
+
+
+# TELEGRAM ALERT FUNCTION
 
 
 def send_telegram_alert(message):
@@ -45,7 +48,10 @@ def send_telegram_alert(message):
 
 def get_crypto_prices():
 
-    coin_list = ",".join(coins.keys())
+    coin_list = ",".join(alerts.keys())
+
+    if not coin_list:
+        return None
 
     url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_list}&vs_currencies=usd"
 
@@ -55,7 +61,7 @@ def get_crypto_prices():
 
         prices = {}
 
-        for coin in coins:
+        for coin in alerts:
             prices[coin] = float(data[coin]["usd"])
 
         return prices
@@ -64,14 +70,15 @@ def get_crypto_prices():
         print("API error:", e)
         return None
 
-# MAIN BOT LOOP
+
+# PRICE MONITORING LOOP
 
 
-alerts = {coin: {"above": False, "below": False} for coin in coins}
+def monitor_prices():
 
-def run_bot():
+    print("🚀 Price monitoring started")
 
-    print("🚀 Crypto Price Bot Started")
+    alert_state = {}
 
     while True:
 
@@ -81,35 +88,68 @@ def run_bot():
             time.sleep(CHECK_INTERVAL)
             continue
 
-        for coin in coins:
+        for coin in alerts:
 
             price = prices[coin]
-            target = coins[coin]
+            target = alerts[coin]
+
+            if coin not in alert_state:
+                alert_state[coin] = {"above": False, "below": False}
 
             print(f"{coin.upper()} Price: ${price}")
 
-            if price > target and not alerts[coin]["above"]:
+            if price > target and not alert_state[coin]["above"]:
 
                 message = f"🚀 {coin.upper()} is ABOVE your target!\nPrice: ${price}"
 
                 send_telegram_alert(message)
 
-                alerts[coin]["above"] = True
-                alerts[coin]["below"] = False
+                alert_state[coin]["above"] = True
+                alert_state[coin]["below"] = False
 
-            elif price < target and not alerts[coin]["below"]:
+            elif price < target and not alert_state[coin]["below"]:
 
                 message = f"📉 {coin.upper()} is BELOW your target!\nPrice: ${price}"
 
                 send_telegram_alert(message)
 
-                alerts[coin]["below"] = True
-                alerts[coin]["above"] = False
+                alert_state[coin]["below"] = True
+                alert_state[coin]["above"] = False
 
         time.sleep(CHECK_INTERVAL)
 
 
-# START BOT
+# API ENDPOINT
+
+
+@app.route("/set-alert", methods=["POST"])
+def set_alert():
+
+    data = request.json
+
+    coin = data["coin"]
+    target = float(data["target"])
+
+    alerts[coin] = target
+
+    print(f"Alert set: {coin} → {target}")
+
+    return jsonify({
+        "status": "success",
+        "coin": coin,
+        "target": target
+    })
+
+
+# START SERVER + BOT
+
 
 if __name__ == "__main__":
-    run_bot()
+
+    # run monitoring in background thread
+    monitor_thread = Thread(target=monitor_prices)
+    monitor_thread.start()
+
+    # start flask server
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
